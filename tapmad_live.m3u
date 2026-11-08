@@ -1,1 +1,7 @@
 #EXTM3U
+#EXTINF:-1 group-title="Tapmad Live Sports", Oldham Athletic vs Sheffield Wednesday
+https://tencent-cdn.tapmad.com/v1/01a1456f124d15fc600b1e3e9683d7/01a145990eba15fc60e91e1786b054/main.m3u8
+#EXTINF:-1 group-title="Tapmad Live Sports", Villarreal vs Getafe
+https://tencent-cdn.tapmad.com/v1/01a145d823d515fc600b1e3e9683de/01a145dc15751ea540a81c2b41b754/main.m3u8
+#EXTINF:-1 group-title="Tapmad Live Sports", Celta vs Levante
+https://tencent-cdn.tapmad.com/v1/01a1548c4faf15fc600b1e3e968408/01a1548c7fde1ea557841e1612cf76/main.m3u8
