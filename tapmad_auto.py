@@ -5,7 +5,6 @@ import os
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 
-# --- GITHUB SECRETS (Automated Login) ---
 PHONE_NUMBER = os.environ.get("TAPMAD_PHONE", "01690053223")
 PIN = os.environ.get("TAPMAD_PIN", "3223")
 DEVICE_ID = "__1ea14efeb3f34338a42a044d960c6351" 
@@ -43,22 +42,43 @@ def main():
         print(f"✅ Logged in! (User ID: {user_id})")
     except KeyError:
         print("❌ Login failed. Tapmad is rate-limiting GitHub's IP.")
-        # Create empty file so GitHub doesn't crash
         with open("tapmad_live.m3u", "w") as f:
             f.write("#EXTM3U\n")
         return
 
     print("2. Fetching live matches...")
-    web_headers = {"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"}
+    # ADDED HEADERS: Making GitHub look like a real browser fetching the JSON
+    web_headers = {
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "accept": "application/json",
+        "referer": "https://www.tapmad.com/",
+        "x-nextjs-data": "1"
+    }
+    
     home_res = session.get("https://www.tapmad.com/", headers=web_headers)
-    build_id = re.search(r'"buildId":"([^"]+)"', home_res.text).group(1)
+    build_id_match = re.search(r'"buildId":"([^"]+)"', home_res.text)
+    
+    if not build_id_match:
+        print("❌ Could not find Build ID. Website might be blocking GitHub.")
+        return
+        
+    build_id = build_id_match.group(1)
     
     sports_url = f"https://www.tapmad.com/_next/data/{build_id}/sports.json"
-    sports_data = session.get(sports_url, headers=web_headers).json()
+    sports_res = session.get(sports_url, headers=web_headers)
     
-    all_matches = find_matches(sports_data)
-    unique_matches = {v['id']: v for v in all_matches}.values()
-    print(f"✅ Found {len(unique_matches)} matches.")
+    try:
+        sports_data = sports_res.json()
+        all_matches = find_matches(sports_data)
+        unique_matches = {v['id']: v for v in all_matches}.values()
+        print(f"✅ Found {len(unique_matches)} matches.")
+    except Exception as e:
+        print(f"❌ Failed to parse JSON from Tapmad. Response might be blocked.")
+        print(f"Status Code: {sports_res.status_code}")
+        print(f"Response snippet: {sports_res.text[:200]}")
+        with open("tapmad_live.m3u", "w") as f:
+            f.write("#EXTM3U\n")
+        return
 
     print("3. Decrypting live streams...")
     api_url = "https://backend-app.tapmad.com/api/getStreamEncrypt"
@@ -103,7 +123,6 @@ def main():
                     stream_json = json.loads(text)
                     stream_url = stream_json.get("Video", {}).get("ContentStreamAdaptive")
                     
-                    # Only add REAL streams (no promos)
                     if stream_url and "promo" not in stream_url.lower() and "promos" not in stream_url.lower():
                         m3u_lines.append(f'#EXTINF:-1 group-title="Tapmad Live Sports", {title}')
                         m3u_lines.append(stream_url)
