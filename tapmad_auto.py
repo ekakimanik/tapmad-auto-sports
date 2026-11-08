@@ -90,12 +90,11 @@ def main():
         except Exception:
             pass
 
-    if count > 0:
-        with open("tapmad_live.m3u", "w", encoding="utf-8") as f:
-            f.write("\n".join(m3u_lines))
-        print(f"\n🎉 SUCCESS! Saved {count} live streams to tapmad_live.m3u")
-    else:
-        print("\n❌ No live streams found.")
+    # ALWAYS CREATE THE FILE, even if 0 streams are found
+    with open("tapmad_live.m3u", "w", encoding="utf-8") as f:
+        f.write("\n".join(m3u_lines))
+        
+    print(f"\n🎉 SUCCESS! Saved {count} live streams to tapmad_live.m3u")
 
 if __name__ == "__main__":
     main()
