@@ -1,13 +1,13 @@
 import requests
 import json
 import re
+import os
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
 
-# --- YOUR DATA (Using Token, No Login) ---
-JWT_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjpbeyJVc2VyVXNlcm5hbWUiOiJUMDE2OTAwNTMyMjMiLCJVc2VyQ291bnRyeUNvZGUiOiJQSyIsInRpbWVzdGFtcCI6MTc5NDE0MTQ5MSwiSWQiOiJjZWVhYTk1Yy02YTFhLTQ2MzAtYmQxOS0zNDNjZjEyYzhkMjYifV0sImlhdCI6MTc5NDE0MTQ5MX0.90CjRT7WKgVNgjcSoEK3ZAaAQ2PhYPiUSjI1RNtCcIM"
-USER_ID = "65994726"
-PHONE_NUMBER = "01690053223"
+# --- GITHUB SECRETS (Automated Login) ---
+PHONE_NUMBER = os.environ.get("TAPMAD_PHONE", "01690053223")
+PIN = os.environ.get("TAPMAD_PIN", "3223")
 DEVICE_ID = "__1ea14efeb3f34338a42a044d960c6351" 
 AES_KEY = b"4nH4LlNWMpVYMP3FNwSsUa030ldjDqUy"
 
@@ -26,27 +26,41 @@ def find_matches(data):
 def main():
     session = requests.Session()
     
-    print("1. Skipping login... Using captured JWT token.")
-    token = JWT_TOKEN
-
-    print("2. Fetching live matches from the app database...")
-    web_headers = {"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"}
+    print("1. Logging in via Android App API...")
+    login_url = "https://backend-app.tapmad.com/api/SignInFreeMobileOperatorTokenByPin"
+    login_headers = {
+        "device-id": DEVICE_ID,
+        "content-type": "application/x-www-form-urlencoded",
+        "user-agent": "okhttp/4.9.3"
+    }
+    
+    login_res = session.post(login_url, headers=login_headers, data={"MobileNo": PHONE_NUMBER, "UserPin": PIN})
+    login_data = login_res.json()
     
     try:
-        home_res = session.get("https://www.tapmad.com/", headers=web_headers)
-        build_id = re.search(r'"buildId":"([^"]+)"', home_res.text).group(1)
-        
-        sports_url = f"https://www.tapmad.com/_next/data/{build_id}/sports.json"
-        sports_data = session.get(sports_url, headers=web_headers).json()
-        
-        all_matches = find_matches(sports_data)
-        unique_matches = {v['id']: v for v in all_matches}.values()
-        print(f"✅ Found {len(unique_matches)} matches in database.")
-    except Exception as e:
-        print(f"❌ Failed to fetch match list: {e}")
+        token = login_data["User"]["jwtToken"]
+        user_id = login_data["User"]["UserId"]
+        print(f"✅ Logged in! (User ID: {user_id})")
+    except KeyError:
+        print("❌ Login failed. Tapmad is rate-limiting GitHub's IP.")
+        # Create empty file so GitHub doesn't crash
+        with open("tapmad_live.m3u", "w") as f:
+            f.write("#EXTM3U\n")
         return
 
-    print("3. Checking which matches are live and decrypting...")
+    print("2. Fetching live matches...")
+    web_headers = {"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"}
+    home_res = session.get("https://www.tapmad.com/", headers=web_headers)
+    build_id = re.search(r'"buildId":"([^"]+)"', home_res.text).group(1)
+    
+    sports_url = f"https://www.tapmad.com/_next/data/{build_id}/sports.json"
+    sports_data = session.get(sports_url, headers=web_headers).json()
+    
+    all_matches = find_matches(sports_data)
+    unique_matches = {v['id']: v for v in all_matches}.values()
+    print(f"✅ Found {len(unique_matches)} matches.")
+
+    print("3. Decrypting live streams...")
     api_url = "https://backend-app.tapmad.com/api/getStreamEncrypt"
     m3u_lines = ["#EXTM3U"]
     count = 0
@@ -66,7 +80,7 @@ def main():
         payload = {
             "ChannelOrVODId": str(match_id),
             "IsChannel": "1",
-            "UserId": str(USER_ID),
+            "UserId": str(user_id),
             "MobileNo": f"T{PHONE_NUMBER}",
             "Version": "v2",
             "Language": "en",
@@ -89,20 +103,18 @@ def main():
                     stream_json = json.loads(text)
                     stream_url = stream_json.get("Video", {}).get("ContentStreamAdaptive")
                     
-                    if stream_url:
+                    # Only add REAL streams (no promos)
+                    if stream_url and "promo" not in stream_url.lower() and "promos" not in stream_url.lower():
                         m3u_lines.append(f'#EXTINF:-1 group-title="Tapmad Live Sports", {title}')
                         m3u_lines.append(stream_url)
                         count += 1
-                        print(f"✅ LIVE & DECRYPTED: {title}")
+                        print(f"✅ {title}")
         except Exception:
             pass
 
-    if count > 0:
-        with open("tapmad_live.m3u", "w", encoding="utf-8") as f:
-            f.write("\n".join(m3u_lines))
-        print(f"\n🎉 SUCCESS! Saved {count} live streams to tapmad_live.m3u")
-    else:
-        print("\n❌ No live streams found right now (or the token expired).")
+    with open("tapmad_live.m3u", "w", encoding="utf-8") as f:
+        f.write("\n".join(m3u_lines))
+    print(f"\n🎉 SUCCESS! Saved {count} live streams.")
 
 if __name__ == "__main__":
     main()

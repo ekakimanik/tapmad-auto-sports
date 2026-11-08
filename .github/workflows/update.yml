@@ -1,7 +1,7 @@
 name: Update Tapmad Playlist
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 permissions:
   contents: write
@@ -16,7 +16,8 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Run Script
         env:
-          TAPMAD_TOKEN: ${{ secrets.TAPMAD_TOKEN }}
+          TAPMAD_PHONE: ${{ secrets.TAPMAD_PHONE }}
+          TAPMAD_PIN: ${{ secrets.TAPMAD_PIN }}
         run: python tapmad_auto.py
       - uses: stefanzweifel/git-auto-commit-action@v5
         with:
