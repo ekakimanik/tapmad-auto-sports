@@ -1,1 +1,5 @@
 #EXTM3U
+#EXTINF:-1 group-title="Tapmad Live Sports", Bangladesh vs West Indies
+https://tencent-cdn.tapmad.com/v1/01a14abbcff31ea540a81c2b41b760/01a14abc06421567ee931e109fa577/main.m3u8
+#EXTINF:-1 group-title="Tapmad Live Sports", Pakistan vs Sri Lanka
+https://tencent-cdn.tapmad.com/v1/01a1456f124d15fc600b1e3e9683d7/01a145990eba15fc60e91e1786b054/main.m3u8
